@@ -5,8 +5,10 @@ const SingleField = ({ maxLength = 6, onSubmit }) => {
   const inputRefs = useRef([]);
 
   useEffect(() => {
+    let abortController;
+
     if ("OTPCredential" in window) {
-      const abortController = new AbortController();
+      abortController = new AbortController();
 
       navigator.credentials
         .get({
@@ -32,10 +34,18 @@ const SingleField = ({ maxLength = 6, onSubmit }) => {
             }
           }
         })
-        .catch((err) => console.error("OTP retrieval failed:", err));
-
-      return () => abortController.abort();
+        .catch((err) => {
+          if (err.name !== "AbortError") {
+            console.error("OTP retrieval failed:", err);
+          }
+        });
     }
+
+    return () => {
+      if (abortController) {
+        abortController.abort(); // Abort the signal when the component unmounts
+      }
+    };
   }, [maxLength, onSubmit]);
 
   const handleInputChange = (index, event) => {
