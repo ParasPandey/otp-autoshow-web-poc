@@ -1,6 +1,5 @@
 {
   "framework": "vite",
-  "installCommand": "npm install --legacy-peer-deps --no-audit --no-fund",
-  "buildCommand": "npm run build",
+  "buildCommand": "yarn build",
   "outputDirectory": "dist"
 }
