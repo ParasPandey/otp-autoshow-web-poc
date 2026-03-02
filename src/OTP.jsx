@@ -3,53 +3,58 @@ import React, { useState, useRef, useEffect } from "react";
 const SingleField = ({ maxLength = 6, onSubmit }) => {
   const [otp, setOtp] = useState(Array(maxLength).fill(""));
   const inputRefs = useRef([]);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
-    let abortController;
+    if (!("OTPCredential" in window)) return;
 
-    if ("OTPCredential" in window) {
-      abortController = new AbortController();
+    const startListening = () => {
+      const ac = new AbortController();
+      abortControllerRef.current = ac;
 
       navigator.credentials
         .get({
           otp: { transport: ["sms"] },
-          signal: abortController.signal,
+          signal: ac.signal,
         })
         .then((otpCredential) => {
-          const receivedOtp = otpCredential.code;
+          if (!otpCredential || !otpCredential.code) return;
+
+          const receivedOtp = otpCredential.code.replace(/\D/g, "");
+
           if (receivedOtp.length === maxLength) {
             const newOtp = receivedOtp.split("");
             setOtp(newOtp);
 
-            // Autofill the inputs
-            newOtp.forEach((digit, index) => {
-              if (inputRefs.current[index]) {
-                inputRefs.current[index].value = digit;
-              }
-            });
-
-            // Optionally, call the submit function
             if (onSubmit) {
               onSubmit(receivedOtp);
             }
           }
+
+          // 🔁 Restart listening after success
+          startListening();
         })
         .catch((err) => {
           if (err.name !== "AbortError") {
             console.error("OTP retrieval failed:", err);
           }
+
+          // 🔁 Restart listening after failure
+          startListening();
         });
-    }
+    };
+
+    startListening();
 
     return () => {
-      if (abortController) {
-        abortController.abort(); // Abort the signal when the component unmounts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
   }, [maxLength, onSubmit]);
 
   const handleInputChange = (index, event) => {
-    const value = event.target.value;
+    const value = event.target.value.replace(/\D/g, "");
     if (value.length > 1) return;
 
     const newOtp = [...otp];
@@ -70,9 +75,11 @@ const SingleField = ({ maxLength = 6, onSubmit }) => {
       if (index > 0 && !otp[index]) {
         inputRefs.current[index - 1]?.focus();
       }
-    } else if (event.key === "Enter") {
+    }
+
+    if (event.key === "Enter") {
       const otpString = otp.join("");
-      if (onSubmit) {
+      if (otpString.length === maxLength && onSubmit) {
         onSubmit(otpString);
       }
     }
@@ -83,9 +90,10 @@ const SingleField = ({ maxLength = 6, onSubmit }) => {
       {otp.map((digit, index) => (
         <input
           key={index}
-          type="password"
-          maxLength="1"
+          type="text"
+          maxLength={1}
           inputMode="numeric"
+          autoComplete={index === 0 ? "one-time-code" : "off"}
           value={digit}
           onChange={(e) => handleInputChange(index, e)}
           onKeyDown={(e) => handleKeyDown(index, e)}
