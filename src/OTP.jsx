@@ -4,11 +4,13 @@ const SingleField = ({ maxLength = 6, onSubmit }) => {
   const [otp, setOtp] = useState(Array(maxLength).fill(""));
   const inputRefs = useRef([]);
   const abortControllerRef = useRef(null);
+  const [webOtpUsed, setWebOtpUsed] = useState(false);
 
   useEffect(() => {
     if (!("OTPCredential" in window)) return;
 
     const startListener = () => {
+      setWebOtpUsed(false);
       const ac = new AbortController();
       abortControllerRef.current = ac;
 
@@ -18,13 +20,14 @@ const SingleField = ({ maxLength = 6, onSubmit }) => {
           signal: ac.signal,
         })
         .then((otpCredential) => {
+          alert("otp received");
+          setWebOtpUsed(true);
           if (!otpCredential?.code) return;
 
           const receivedOtp = otpCredential.code.replace(/\D/g, "");
           if (receivedOtp.length === maxLength) {
             const newOtp = receivedOtp.split("");
             setOtp(newOtp);
-            if (onSubmit) onSubmit(receivedOtp);
           }
 
           // Restart listener for next OTP
@@ -41,7 +44,7 @@ const SingleField = ({ maxLength = 6, onSubmit }) => {
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [maxLength, onSubmit]);
+  }, [maxLength]);
 
   const handleInputChange = (index, event) => {
     const value = event.target.value.replace(/\D/g, "");
@@ -70,6 +73,7 @@ const SingleField = ({ maxLength = 6, onSubmit }) => {
 
   return (
     <div className="container">
+      {webOtpUsed && <p>WebOTP API captured the SMS</p>}
       {otp.map((digit, index) => (
         <input
           key={index}
